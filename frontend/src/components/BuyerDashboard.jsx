@@ -73,7 +73,7 @@ const BuyerDashboard = () => {
   const [error, setError] = useState('');
 
   // ✅ BACKEND INTEGRATION CONSTANTS
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8001';
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8002';
   const API_BASE = `${BACKEND_URL}/api`;
 
   // Use context instead of local state
@@ -203,17 +203,40 @@ const BuyerDashboard = () => {
 
       const headers = getAuthHeaders();
 
+      // Load all data from real API
+      // Products can be fetched without auth (public browsing)
+      let productsResponse;
+      try {
+        // Try with auth first if available, otherwise without
+        const productHeaders = headers.Authorization ? headers : {};
+        productsResponse = await axios.get(`${API_BASE}/products`, {
+          headers: productHeaders,
+          timeout: 10000
+        });
+        console.log('✅ Products loaded:', productsResponse.data?.length || 0, 'products');
+      } catch (err) {
+        console.error('❌ Error loading products:', err.response?.status, err.response?.data || err.message);
+        // Try without auth headers if auth failed
+        try {
+          productsResponse = await axios.get(`${API_BASE}/products`, { timeout: 10000 });
+          console.log('✅ Products loaded without auth:', productsResponse.data?.length || 0, 'products');
+        } catch (err2) {
+          console.error('❌ Products endpoint failed even without auth:', err2.message);
+          productsResponse = { data: [] };
+        }
+      }
+
+      // Only require auth for orders and profile
       if (!headers.Authorization) {
-        console.error('❌ No authorization header');
+        console.warn('⚠️ No authorization header - loading products only');
+        // Set products even without auth
+        const productsData = Array.isArray(productsResponse.data) ? productsResponse.data : [];
+        setProducts(productsData);
+        setLoading(false);
         return;
       }
 
-      // Load all data from real API
-      const [productsResponse, ordersResponse, profileResponse] = await Promise.all([
-        axios.get(`${API_BASE}/products`, { headers }).catch(err => {
-          console.log('⚠️ Products endpoint not working yet - using empty products list');
-          return { data: [] };
-        }),
+      const [ordersResponse, profileResponse] = await Promise.all([
         axios.get(`${API_BASE}/orders/my-orders`, { headers }).catch(err => {
           console.log('⚠️ Orders endpoint not working yet - using empty orders list');
           return { data: [] };
@@ -225,8 +248,32 @@ const BuyerDashboard = () => {
       ]);
 
       // Set real data from API
-      setProducts(productsResponse.data || []);
-      setOrders(ordersResponse.data || []);
+      let productsData = Array.isArray(productsResponse.data) ? productsResponse.data : [];
+      
+      // Fix image URLs to include full backend URL
+      productsData = productsData.map(product => {
+        if (product.images && Array.isArray(product.images)) {
+          product.images = product.images.map(img => {
+            if (typeof img === 'string') {
+              return img.startsWith('http') ? img : `${BACKEND_URL}${img}`;
+            } else if (img.image_url) {
+              return img.image_url.startsWith('http') ? img.image_url : `${BACKEND_URL}${img.image_url}`;
+            }
+            return img;
+          });
+        }
+        return product;
+      });
+      
+      const ordersData = ordersResponse.data || [];
+      
+      console.log('📦 Products data:', productsData.length, 'items');
+      if (productsData.length > 0) {
+        console.log('📦 First product sample:', productsData[0]);
+      }
+      
+      setProducts(productsData);
+      setOrders(ordersData);
 
       // Update user profile with backend data
       if (profileResponse.data) {
@@ -255,11 +302,17 @@ const BuyerDashboard = () => {
         loadUserProfile();
       }
 
-      // Set default analytics
+      // Calculate analytics based on actual data
+      const totalSpent = ordersData.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+      const totalOrders = ordersData.length;
+      const uniqueFarmerIds = new Set(productsData.map(p => p.farmer_id).filter(id => id));
+      const favoriteFarmersCount = uniqueFarmerIds.size;
+      
+      // Set analytics with calculated values
       setAnalytics({
-        total_spent: ordersResponse.data?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0,
-        total_orders: ordersResponse.data?.length || 0,
-        favorite_farmers: new Set(productsResponse.data?.map(p => p.farmer_id)).size || 0,
+        total_spent: totalSpent,
+        total_orders: totalOrders,
+        favorite_farmers: favoriteFarmersCount,
         saved_products: favorites.length,
         monthly_spending: [],
         category_spending: [],
@@ -352,6 +405,17 @@ const BuyerDashboard = () => {
       }
     });
 
+  // Update favorite_farmers count when products change
+  useEffect(() => {
+    if (products.length > 0) {
+      const uniqueFarmerIds = new Set(products.map(p => p.farmer_id).filter(id => id));
+      setAnalytics(prev => ({
+        ...prev,
+        favorite_farmers: uniqueFarmerIds.size
+      }));
+    }
+  }, [products]);
+
   // Cart management
   const handleAddToCart = (product, quantity = 1) => {
     const existingItem = cartItems.find(item => item.product_id === product.id);
@@ -402,11 +466,17 @@ const BuyerDashboard = () => {
   };
 
   const toggleFavorite = (productId) => {
-    if (favorites.includes(productId)) {
-      setFavorites(favorites.filter(id => id !== productId));
-    } else {
-      setFavorites([...favorites, productId]);
-    }
+    const updatedFavorites = favorites.includes(productId)
+      ? favorites.filter(id => id !== productId)
+      : [...favorites, productId];
+    
+    setFavorites(updatedFavorites);
+    
+    // Update analytics with new saved products count
+    setAnalytics(prev => ({
+      ...prev,
+      saved_products: updatedFavorites.length
+    }));
   };
 
   const getCartItemQuantity = (productId) => {
@@ -463,13 +533,15 @@ const BuyerDashboard = () => {
         const ordersResponse = await axios.get(`${API_BASE}/orders/my-orders`, {
           headers: getAuthHeaders()
         });
-        setOrders(ordersResponse.data || []);
+        const updatedOrders = ordersResponse.data || [];
+        setOrders(updatedOrders);
 
-        // Update analytics
+        // Recalculate analytics based on all orders
+        const totalSpent = updatedOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
         setAnalytics(prev => ({
           ...prev,
-          total_orders: (prev?.total_orders || 0) + 1,
-          total_spent: (prev?.total_spent || 0) + response.data.total_amount
+          total_orders: updatedOrders.length,
+          total_spent: totalSpent
         }));
 
         // Add to recent activities
@@ -1040,7 +1112,7 @@ const BuyerDashboard = () => {
                   change={analytics?.total_orders > 0 ? "+5%" : "0%"}
                   changeType={analytics?.total_orders > 0 ? "positive" : "neutral"}
                   icon={Package}
-                  description="Completed purchases"
+                  description={`${analytics?.total_orders || 0} Completed ${analytics?.total_orders === 1 ? 'purchase' : 'purchases'}`}
                 />
                 <StatsCard
                   title="Favorite Farmers"
@@ -1048,7 +1120,7 @@ const BuyerDashboard = () => {
                   change={analytics?.favorite_farmers > 0 ? "+2" : "0"}
                   changeType={analytics?.favorite_farmers > 0 ? "positive" : "neutral"}
                   icon={Heart}
-                  description="Trusted suppliers"
+                  description={`${analytics?.favorite_farmers || 0} Trusted ${(analytics?.favorite_farmers || 0) === 1 ? 'supplier' : 'suppliers'}`}
                 />
                 <StatsCard
                   title="Cart Items"
@@ -1056,7 +1128,7 @@ const BuyerDashboard = () => {
                   change="0"
                   changeType="neutral"
                   icon={ShoppingCart}
-                  description="Ready to checkout"
+                  description={`${cartItems.length} ${cartItems.length === 1 ? 'item' : 'items'} ready to checkout`}
                 />
               </div>
 
@@ -1258,10 +1330,19 @@ const BuyerDashboard = () => {
                           }`}>
                             <div className="relative mb-4">
                               <img
-                                src={product.images?.[0] || '/api/placeholder/300/200?text=Product+Image'}
+                                src={
+                                  product.images?.[0] 
+                                    ? (typeof product.images[0] === 'string' 
+                                        ? product.images[0] 
+                                        : product.images[0].image_url || product.images[0])
+                                    : '/api/placeholder/300/200?text=Product+Image'
+                                }
                                 alt={product.name}
                                 className="w-full h-48 object-cover rounded-lg cursor-pointer"
                                 onClick={() => openProductModal(product)}
+                                onError={(e) => {
+                                  e.target.src = '/api/placeholder/300/200?text=Product+Image';
+                                }}
                               />
                               <div className="absolute top-2 right-2 flex space-x-1">
                                 <Button
@@ -1984,9 +2065,18 @@ const BuyerDashboard = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <img
-                      src={selectedProduct.images?.[0] || '/api/placeholder/400/300'}
+                      src={
+                        selectedProduct.images?.[0] 
+                          ? (typeof selectedProduct.images[0] === 'string' 
+                              ? selectedProduct.images[0] 
+                              : selectedProduct.images[0].image_url || selectedProduct.images[0])
+                          : '/api/placeholder/400/300'
+                      }
                       alt={selectedProduct.name}
                       className="w-full h-64 object-cover rounded-lg"
+                      onError={(e) => {
+                        e.target.src = '/api/placeholder/400/300';
+                      }}
                     />
                   </div>
 

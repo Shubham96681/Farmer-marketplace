@@ -170,7 +170,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 
 # ✅ MOUNT STATIC FILES FOR IMAGE UPLOADS
-app.mount("/media", StaticFiles(directory="media"), name="media")
+# Create media directory if it doesn't exist
+media_dir = backend_dir / "media"
+media_dir.mkdir(exist_ok=True)
+(media_dir / "products").mkdir(exist_ok=True)
+
+app.mount("/media", StaticFiles(directory=str(media_dir)), name="media")
 
 # ✅ INCLUDE ROUTERS WITH CORRECT VARIABLES
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])

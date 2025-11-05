@@ -125,12 +125,12 @@ class ProductImageResponse(ProductImageBase):
 
 
 class ProductBase(BaseModel):
-    name: str
-    description: str
-    price: float
-    category: str
-    unit: str
-    quantity_available: int  # ✅ changed here
+    name: str = Field(..., min_length=1, max_length=255, description="Product name")
+    description: str = Field(..., min_length=1, description="Product description")
+    price: float = Field(..., gt=0, description="Product price (must be greater than 0)")
+    category: str = Field(..., min_length=1, description="Product category")
+    unit: str = Field(..., min_length=1, description="Product unit (e.g., kg, bag, piece)")
+    quantity_available: int = Field(..., ge=0, description="Available quantity (must be 0 or greater)")
 
 
 class ProductCreate(ProductBase):

@@ -46,10 +46,10 @@ async def create_order(
                     detail=f"Product {item.product_id} not found or unavailable"
                 )
 
-            if product.stock_quantity < item.quantity:
+            if product.quantity_available < item.quantity:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Not enough stock for {product.name}. Available: {product.stock_quantity}"
+                    detail=f"Not enough stock for {product.name}. Available: {product.quantity_available}"
                 )
 
             item_total = product.price * item.quantity
@@ -65,8 +65,8 @@ async def create_order(
             order_items.append(order_item)
 
             # Update product stock
-            product.stock_quantity -= item.quantity
-            if product.stock_quantity <= 0:
+            product.quantity_available -= item.quantity
+            if product.quantity_available <= 0:
                 product.is_available = False
 
         # Create order
@@ -287,7 +287,7 @@ async def cancel_order(
             ).first()
 
             if product:
-                product.stock_quantity += order_item.quantity
+                product.quantity_available += order_item.quantity
                 if not product.is_available:
                     product.is_available = True
 

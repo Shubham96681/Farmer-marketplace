@@ -546,11 +546,29 @@ const FarmerDashboard = () => {
         setOrders([]);
       }
 
+      // Calculate customer ratings from reviews (if available)
+      const calculateCustomerRating = (products) => {
+        const allRatings = [];
+        products.forEach(product => {
+          if (product.reviews && Array.isArray(product.reviews)) {
+            product.reviews.forEach(review => {
+              if (review.rating) allRatings.push(review.rating);
+            });
+          }
+        });
+        if (allRatings.length === 0) return 0.0;
+        const avgRating = allRatings.reduce((sum, rating) => sum + rating, 0) / allRatings.length;
+        return Math.round(avgRating * 10) / 10; // Round to 1 decimal place
+      };
+
+      // Count active products (products that are available)
+      const activeProductsCount = products.filter(p => p.is_available !== false).length;
+
       // Set analytics based on real data
       setAnalytics({
         total_earnings: orders.reduce((sum, order) => sum + (order.total_amount || 0), 0),
         total_orders: orders.length,
-        active_products: products.length,
+        active_products: activeProductsCount,
         total_customers: new Set(orders.map(order => order.buyer_id || order.buyer_name)).size,
         monthly_earnings: [
           { month: "Jan", earned: 12000 },
@@ -565,7 +583,10 @@ const FarmerDashboard = () => {
           revenue: product.price * 10, // Demo calculation
           sales: Math.floor(Math.random() * 100) + 10
         })),
-        customer_ratings: 4.5
+        customer_ratings: calculateCustomerRating(products),
+        total_reviews: products.reduce((sum, product) => {
+          return sum + (product.reviews && Array.isArray(product.reviews) ? product.reviews.length : 0);
+        }, 0)
       });
 
     } catch (error) {
@@ -845,7 +866,17 @@ const handleAddProduct = async (e) => {
           : ['/api/placeholder/400/300?text=' + encodeURIComponent(newProduct.name)]
     };
 
-    setProducts(prev => [productWithImages, ...prev]);
+    setProducts(prev => {
+      const updatedProducts = [productWithImages, ...prev];
+      
+      // Update analytics with new product count
+      setAnalytics(prevAnalytics => ({
+        ...prevAnalytics,
+        active_products: updatedProducts.filter(p => p.is_available !== false).length
+      }));
+      
+      return updatedProducts;
+    });
 
     // Reset form
     setNewProduct({
@@ -884,13 +915,27 @@ const handleAddProduct = async (e) => {
     if (error.response) {
       console.error('📡 Server response error:', error.response.status, error.response.data);
 
-      if (error.response.status === 500) {
-        errorMessage = 'Backend validation error. Check backend logs for response format issues.';
+      if (error.response.status === 422 || error.response.status === 400) {
+        // Handle validation errors
+        const detail = error.response.data?.detail;
+        if (Array.isArray(detail)) {
+          // Pydantic validation errors
+          const errors = detail.map(err => {
+            const field = err.loc?.join('.') || 'field';
+            return `${field}: ${err.msg}`;
+          }).join('\n');
+          errorMessage = `Validation errors:\n${errors}`;
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else {
+          errorMessage = 'Invalid product data. Please check your inputs.';
+        }
+      } else if (error.response.status === 500) {
+        const detail = error.response.data?.detail || 'Unknown server error';
+        errorMessage = `Server error: ${detail}`;
       } else if (error.response.status === 401) {
         errorMessage = 'Authentication failed. Please log in again.';
         setAuthError(errorMessage);
-      } else if (error.response.status === 422) {
-        errorMessage = 'Invalid product data. Please check your inputs.';
       } else {
         errorMessage = `Server error (${error.response.status}): ${error.response.data?.detail || 'Unknown error'}`;
       }
@@ -1112,14 +1157,19 @@ const handleAddProduct = async (e) => {
         }
       );
 
-      // Remove product from local state
-      setProducts(prev => prev.filter(product => product.id !== productId));
-
-      // Update analytics
-      setAnalytics(prev => ({
-        ...prev,
-        active_products: Math.max(0, (prev?.active_products || 0) - 1)
-      }));
+      // Remove product from local state and update analytics
+      setProducts(prev => {
+        const updatedProducts = prev.filter(product => product.id !== productId);
+        
+        // Recalculate analytics based on actual products
+        const activeProductsCount = updatedProducts.filter(p => p.is_available !== false).length;
+        setAnalytics(prevAnalytics => ({
+          ...prevAnalytics,
+          active_products: activeProductsCount
+        }));
+        
+        return updatedProducts;
+      });
 
       alert('✅ Product deleted successfully!');
 
@@ -1572,7 +1622,7 @@ const handleAddProduct = async (e) => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <StatsCard
                   title="Total Earnings"
-                  value={formatCurrency(analytics?.total_earnings)}
+                  value={formatCurrency(analytics?.total_earnings || 0)}
                   change="0"
                   changeType="neutral"
                   icon={DollarSign}
@@ -1584,23 +1634,23 @@ const handleAddProduct = async (e) => {
                   change="0"
                   changeType="neutral"
                   icon={Package}
-                  description="All-time orders"
+                  description={`${analytics?.total_orders || 0} All-time orders`}
                 />
                 <StatsCard
                   title="Active Products"
-                  value={(analytics?.active_products || products.length).toString()}
+                  value={(analytics?.active_products ?? products.filter(p => p.is_available !== false).length).toString()}
                   change="0"
                   changeType="neutral"
                   icon={User}
-                  description="Products listed"
+                  description={`${analytics?.active_products ?? products.filter(p => p.is_available !== false).length} Products listed`}
                 />
                 <StatsCard
                   title="Customer Rating"
-                  value={(analytics?.customer_ratings || '0.0').toString()}
+                  value={(analytics?.customer_ratings ?? 0.0).toString()}
                   change="0"
                   changeType="neutral"
                   icon={Star}
-                  description="Based on reviews"
+                  description={`Based on ${analytics?.total_reviews ?? 0} ${analytics?.total_reviews === 1 ? 'review' : 'reviews'}`}
                 />
               </div>
 
@@ -2517,8 +2567,8 @@ const handleAddProduct = async (e) => {
                     {productErrors.category && <p className="text-red-500 text-sm mt-1">{productErrors.category}</p>}
                   </div>
 
-                  <div>
-                    <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  <div className="w-full">
+                    <label className={`block text-sm font-medium mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
                       Product Images
                     </label>
 
@@ -2532,22 +2582,64 @@ const handleAddProduct = async (e) => {
                       id="product-images"
                     />
 
+                    {/* Image previews - Always show container */}
+                    <div className="w-full mb-4">
+                      {newProduct.images.length > 0 ? (
+                        <>
+                          <p className={`text-sm font-medium mb-3 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            Selected Images ({newProduct.images.length}/5)
+                          </p>
+                          <div className="flex flex-wrap gap-3 w-full overflow-visible">
+                            {newProduct.images.map((image, index) => {
+                              const imageUrl = typeof image === 'string' ? image : URL.createObjectURL(image);
+                              return (
+                                <div key={index} className="relative inline-block">
+                                  <div className="w-28 h-28 rounded-lg overflow-hidden border-2 border-blue-400 shadow-md bg-gray-100">
+                                    <img
+                                      src={imageUrl}
+                                      alt={`Preview ${index + 1}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e) => {
+                                        e.target.src = '/api/placeholder/112/112?text=Image+Error';
+                                      }}
+                                    />
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeImage(index)}
+                                    className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-full w-7 h-7 flex items-center justify-center text-base font-bold shadow-lg transition-all z-10"
+                                    title="Remove image"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </>
+                      ) : (
+                        <p className={`text-xs ${darkMode ? 'text-gray-500' : 'text-gray-400'} mb-2`}>
+                          No images selected. Upload images below.
+                        </p>
+                      )}
+                    </div>
+
                     {/* Upload area */}
                     <label
                       htmlFor="product-images"
-                      className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
+                      className={`block w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
                         darkMode
                           ? 'border-gray-600 bg-gray-700 hover:border-gray-400 hover:bg-gray-600'
-                          : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'
+                          : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
                       }`}
                     >
                       <div className="flex flex-col items-center justify-center space-y-3">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
                         <div>
-                          <p className={`text-sm font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                            Click to upload images
+                          <p className={`text-base font-medium ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {newProduct.images.length > 0 ? 'Add more images' : 'Click to upload images'}
                           </p>
                           <p className={`text-xs ${darkMode ? 'text-gray-400' : 'text-gray-500'} mt-1`}>
                             PNG, JPG, WEBP up to 10MB (Max 5 images)
@@ -2555,33 +2647,6 @@ const handleAddProduct = async (e) => {
                         </div>
                       </div>
                     </label>
-
-                    {/* Image previews */}
-                    {newProduct.images.length > 0 && (
-                      <div className="mt-4">
-                        <p className={`text-sm font-medium mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                          Selected Images ({newProduct.images.length})
-                        </p>
-                        <div className="grid grid-cols-3 gap-2">
-                          {newProduct.images.map((image, index) => (
-                            <div key={index} className="relative group">
-                              <img
-                                src={typeof image === 'string' ? image : URL.createObjectURL(image)}
-                                alt={`Preview ${index + 1}`}
-                                className="w-full h-20 object-cover rounded-lg border border-gray-200"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeImage(index)}
-                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                ×
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   <div>

@@ -33,7 +33,14 @@ async def get_products(
 ):
     """Get all products with optional filtering"""
     try:
-        query = db.query(models.Product).filter(models.Product.is_available == True)
+        # Get all available products (is_available is True or None/not explicitly False)
+        from sqlalchemy import or_
+        query = db.query(models.Product).filter(
+            or_(
+                models.Product.is_available == True,
+                models.Product.is_available.is_(None)
+            )
+        )
 
         if category:
             query = query.filter(models.Product.category.ilike(f"%{category}%"))
@@ -85,7 +92,7 @@ async def create_product(
             price=product.price,
             category=product.category,
             unit=product.unit,
-            stock_quantity=product.stock_quantity,  # ✅ Use stock_quantity
+            quantity_available=product.quantity_available,  # ✅ Fixed: Use quantity_available (matches schema and model)
             farmer_id=current_user.id,
             is_available=True,
             min_order_quantity=1
@@ -99,9 +106,15 @@ async def create_product(
 
         return db_product
 
+    except ValueError as e:
+        db.rollback()
+        print(f"❌ Validation error creating product: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Validation error: {str(e)}")
     except Exception as e:
         db.rollback()
         print(f"❌ Error creating product: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error creating product: {str(e)}")
         #Update product (Farmer only)
 

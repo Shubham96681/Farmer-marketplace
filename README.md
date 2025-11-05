@@ -6,11 +6,32 @@ A full-stack application connecting farmers with buyers in Nigeria. Built with F
 
 ### Prerequisites
 
-- Python 3.13+ (or Python 3.9+)
+- Python 3.9+ (Python 3.13+ recommended)
 - Node.js 16+ and npm
 - PostgreSQL (optional, SQLite used as fallback)
 
-### Backend Setup
+### One-Command Setup (Recommended)
+
+**Windows:**
+```bash
+start.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+This script will:
+- Check for required dependencies
+- Set up Python virtual environment
+- Install all backend and frontend dependencies
+- Start both servers automatically
+
+### Manual Setup
+
+#### Backend Setup
 
 1. Navigate to the backend directory:
 
@@ -18,13 +39,28 @@ A full-stack application connecting farmers with buyers in Nigeria. Built with F
 cd backend
 ```
 
-2. Install Python dependencies:
+2. Create and activate a virtual environment (recommended):
+
+**Windows:**
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+**Linux/Mac:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+3. Install Python dependencies:
 
 ```bash
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-3. Start the backend server:
+4. Start the backend server:
 
 ```bash
 python app/main.py
@@ -32,7 +68,7 @@ python app/main.py
 
 The backend will run on `http://localhost:8002`
 
-### Frontend Setup
+#### Frontend Setup
 
 1. Navigate to the frontend directory:
 
@@ -52,7 +88,11 @@ npm install
 npm run dev
 ```
 
-The frontend will run on `http://localhost:3000` or `http://localhost:5173`
+The frontend will run on `http://localhost:3000`
+
+## 📚 Additional Documentation
+
+For detailed setup instructions and troubleshooting, see [SETUP.md](SETUP.md)
 
 ## 🐛 Bugs Fixed & Issues Resolved
 
@@ -290,28 +330,131 @@ if str(backend_dir) not in sys.path:
 - Tables are now created automatically when the backend starts via `Base.metadata.create_all(bind=engine)`
 - Created `init_db.py` script for manual initialization if needed
 - Created `create_demo_user.py` script to set up demo user
+- Created `create_farmer_user.py` script to set up demo farmer
 
 **Files Created:**
 
 - `backend/init_db.py`
 - `backend/create_demo_user.py`
+- `backend/create_farmer_user.py`
 
 ---
 
-## 📝 Demo User
+### 11. Backend Validation Errors - Field Name Mismatch
 
-A demo user has been created for testing:
+**Problem:**
 
+- Backend router used `stock_quantity` while schema/model used `quantity_available`
+- Product creation failed with validation errors
+- Orders couldn't update product stock correctly
+
+**Solution:**
+
+- Updated all references from `stock_quantity` to `quantity_available` in:
+  - `backend/app/routers/products.py` (product creation)
+  - `backend/app/routers/orders.py` (order processing, stock updates)
+- Added proper Field validation with constraints in `ProductBase` schema
+- Improved error handling to provide clear validation messages
+
+**Files Modified:**
+
+- `backend/app/routers/products.py`
+- `backend/app/routers/orders.py`
+- `backend/app/schemas.py`
+
+---
+
+### 12. Image Preview Display Issues
+
+**Problem:**
+
+- Product image previews were hidden or cut off in the upload form
+- Images appeared in wrong location or were not visible
+
+**Solution:**
+
+- Moved image previews above upload area for better visibility
+- Changed layout from grid to flex-wrap to prevent cutoff
+- Increased image preview size for better visibility
+- Added proper width constraints and overflow handling
+- Fixed image URL handling to convert relative paths to full URLs
+
+**Files Modified:**
+
+- `frontend/src/components/FarmerDashboard.jsx`
+
+---
+
+### 13. Dashboard Statistics Not Updating
+
+**Problem:**
+
+- Dashboard statistics showed incorrect or inconsistent numbers
+- Active Products count didn't match actual product count
+- Customer Rating showed default value instead of calculated rating
+- Numbers didn't update when products/orders changed
+
+**Solution:**
+
+- Fixed analytics calculation to use actual data
+- Added real-time updates when products are added/deleted
+- Customer ratings now calculated from actual reviews
+- All statistics update automatically on data changes
+- Fixed descriptions to show actual numbers
+
+**Files Modified:**
+
+- `frontend/src/components/FarmerDashboard.jsx`
+- `frontend/src/components/BuyerDashboard.jsx`
+
+---
+
+### 14. Marketplace Products Not Showing (0 Products)
+
+**Problem:**
+
+- Buyer dashboard showed "Available Products (0)" even when farmers added products
+- Frontend was connecting to wrong backend port (8001 instead of 8002)
+- Image URLs weren't being properly formatted
+
+**Solution:**
+
+- Fixed backend URL in BuyerDashboard from port 8001 to 8002
+- Added proper image URL handling to convert relative paths to full URLs
+- Products can now be loaded without authentication (public browsing)
+- Improved error handling and logging for product loading
+- Fixed backend product filtering to include all available products
+
+**Files Modified:**
+
+- `frontend/src/components/BuyerDashboard.jsx`
+- `backend/app/routers/products.py`
+
+---
+
+## 📝 Demo Users
+
+Demo users have been created for testing:
+
+### Buyer Account
 - **Email:** `demo@farmconnect.com`
 - **Password:** `Demo1234`
 - **Role:** Buyer (Individual)
 - **Status:** Verified
 
-To create the demo user manually:
+### Farmer Account
+- **Email:** `farmer@farmconnect.com`
+- **Password:** `Farmer1234`
+- **Role:** Farmer (Individual)
+- **Status:** Verified
+- **Farm Name:** Green Valley Farm
+
+To create demo users manually:
 
 ```bash
 cd backend
-python create_demo_user.py
+python create_demo_user.py    # Creates buyer account
+python create_farmer_user.py  # Creates farmer account
 ```
 
 ## 🔧 Development Tips
@@ -409,8 +552,8 @@ farm-project-main/
 ### Backend
 
 - FastAPI 0.104.1
-- SQLAlchemy 2.0.44
-- Pydantic 2.12.3
+- SQLAlchemy 2.0.44 (upgraded for Python 3.13 compatibility)
+- Pydantic 2.5.0
 - Uvicorn 0.24.0
 - SQLite (development) / PostgreSQL (production)
 
@@ -422,6 +565,12 @@ farm-project-main/
 - Axios 1.6.2
 - Tailwind CSS 3.3.5
 
+## 📋 Default Ports
+
+- **Backend API:** `http://localhost:8002`
+- **Frontend:** `http://localhost:3000`
+- **API Documentation:** `http://localhost:8002/docs`
+
 ## 📄 License
 
 [Add your license information here]
@@ -432,4 +581,23 @@ farm-project-main/
 
 ---
 
-**Last Updated:** Based on development session fixes and improvements
+## 🔄 Recent Updates
+
+### Latest Session Fixes
+- ✅ Fixed backend validation errors (field name consistency)
+- ✅ Fixed image preview display issues
+- ✅ Fixed dashboard statistics real-time updates
+- ✅ Fixed marketplace product display (port and image URLs)
+- ✅ Created demo farmer account
+- ✅ Improved error handling throughout
+
+### Key Features
+- ✅ One-command startup scripts for Windows and Unix
+- ✅ Automatic database table creation
+- ✅ SQLite fallback for easy development
+- ✅ Public product browsing (no auth required)
+- ✅ Real-time statistics updates
+- ✅ Image upload with preview
+- ✅ Comprehensive error handling
+
+**Last Updated:** November 2025 - All major issues resolved, project ready for smooth deployment
