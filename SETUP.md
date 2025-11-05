@@ -31,7 +31,9 @@ This will:
 - Check for Python and Node.js
 - Create Python virtual environment
 - Install all dependencies
-- Start both backend and frontend servers
+- Create demo users automatically (if they don't exist)
+- Start both backend and frontend servers in separate windows
+- Display demo account credentials
 
 ### Linux/Mac
 
@@ -195,6 +197,13 @@ Open your browser and visit:
 2. **Clear Cache:** Clear browser cache if you see old frontend code
 3. **Hot Reload:** Both servers support hot reload - changes will reflect automatically
 4. **API Testing:** Use the Swagger UI at `http://localhost:8002/docs` to test API endpoints
+5. **User Management:** 
+   - Use `python check_users.py` to see all users and their status
+   - Use `python create_demo_users.py` to create demo users (safe to run multiple times)
+6. **Demo Users:** Demo users are auto-created on startup via `start.bat`, or run `python create_demo_users.py` manually
+7. **Login Debugging:** 
+   - Check the backend console window (FarmConnect Backend) for detailed login attempt logs
+   - Logs show: user lookup, password verification, verification status, and specific error messages
 
 ## Project Structure
 
@@ -221,28 +230,48 @@ FarmConnect/
 
 ## Demo Accounts
 
-After setup, you can use these demo accounts:
+Demo accounts are automatically created when you run the startup script. Use these credentials to login:
 
 ### Buyer Account
 - **Email:** `demo@farmconnect.com`
 - **Password:** `Demo1234`
+- **Username:** `demouser`
 - **Role:** Buyer (Individual)
+- **Status:** Verified and Active
 
 ### Farmer Account
 - **Email:** `farmer@farmconnect.com`
 - **Password:** `Farmer1234`
+- **Username:** `demofarmer`
 - **Role:** Farmer (Individual)
 - **Farm:** Green Valley Farm
+- **Status:** Verified and Active
 
 ### Creating Demo Accounts Manually
 
-If you need to recreate demo accounts:
+If you need to create or recreate demo accounts:
 
 ```bash
 cd backend
-python create_demo_user.py      # Creates buyer
-python create_farmer_user.py    # Creates farmer
+python create_demo_users.py     # Creates both (recommended)
+# OR
+python create_demo_user.py      # Creates buyer only
+python create_farmer_user.py    # Creates farmer only
 ```
+
+### Checking Users in Database
+
+To see all users and their status:
+
+```bash
+cd backend
+python check_users.py
+```
+
+This will display:
+- All users in the database
+- Their verification and active status
+- Demo account credentials
 
 ## Common Issues and Solutions
 
@@ -285,6 +314,39 @@ python create_farmer_user.py    # Creates farmer
 - Check that quantity is a number >= 0
 - Verify price is a number > 0
 - Check browser console for specific validation error messages
+
+### Login Issues
+
+**Issue:** Cannot login or login fails silently
+
+**Solution:**
+1. **Check if users exist:**
+   ```bash
+   cd backend
+   python check_users.py
+   ```
+
+2. **Create demo users if missing:**
+   ```bash
+   cd backend
+   python create_demo_users.py
+   ```
+
+3. **Check backend logs:** The backend console window will show detailed login attempt logs including:
+   - User lookup results
+   - Password verification status
+   - Verification status check
+   - Specific error messages
+
+4. **Common login failures:**
+   - User not found: Email/username doesn't exist - create demo users
+   - Invalid credentials: Wrong password - use Demo1234 or Farmer1234
+   - Email not verified: User exists but isn't verified - demo users are pre-verified
+   - User inactive: User is deactivated - demo users are active
+
+5. **Verify credentials:**
+   - Buyer: `demo@farmconnect.com` / `Demo1234`
+   - Farmer: `farmer@farmconnect.com` / `Farmer1234`
 
 ## Need Help?
 

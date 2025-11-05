@@ -24,10 +24,12 @@ chmod +x start.sh
 ```
 
 This script will:
-- Check for required dependencies
+- Check for required dependencies (Python and Node.js)
 - Set up Python virtual environment
 - Install all backend and frontend dependencies
-- Start both servers automatically
+- Create demo users automatically (if they don't exist)
+- Start both servers automatically in separate windows
+- Display demo account credentials
 
 ### Manual Setup
 
@@ -432,30 +434,84 @@ if str(backend_dir) not in sys.path:
 
 ---
 
+### 15. Login Debugging and User Management Improvements
+
+**Problem:**
+
+- Login failures were difficult to diagnose
+- No easy way to check if users exist in database
+- Demo users had to be created manually
+
+**Solution:**
+
+- Added comprehensive logging to login endpoint showing step-by-step process
+- Created `check_users.py` script to list all users in database
+- Created `create_demo_users.py` script to automatically create demo users (both buyer and farmer)
+- Updated `start.bat` to automatically create demo users on first run
+- Enhanced error messages to show exactly why login fails
+- Login endpoint now shows all available users if login fails due to user not found
+
+**Files Modified:**
+
+- `backend/app/routers/auth.py` (enhanced login logging with step-by-step details)
+- `backend/check_users.py` (new utility script to list users)
+- `backend/create_demo_users.py` (new utility script to create both demo users)
+- `start.bat` (auto-create demo users on startup)
+
+**Key Features:**
+
+- Login endpoint now logs: user lookup, password verification, verification status, active status
+- If user not found, logs all available users in database with their details
+- Demo users are automatically created if they don't exist (safe to run multiple times)
+- Clear error messages for debugging login issues
+- Backend console window shows detailed login attempt logs
+
+---
+
 ## 📝 Demo Users
 
-Demo users have been created for testing:
+Demo users are automatically created when you run `start.bat` (or `start.sh`). If you need to create them manually:
 
 ### Buyer Account
 - **Email:** `demo@farmconnect.com`
 - **Password:** `Demo1234`
+- **Username:** `demouser`
 - **Role:** Buyer (Individual)
-- **Status:** Verified
+- **Status:** Verified ✓, Active ✓
 
 ### Farmer Account
 - **Email:** `farmer@farmconnect.com`
 - **Password:** `Farmer1234`
+- **Username:** `demofarmer`
 - **Role:** Farmer (Individual)
-- **Status:** Verified
+- **Status:** Verified ✓, Active ✓
 - **Farm Name:** Green Valley Farm
 
-To create demo users manually:
+### Creating Demo Users Manually
+
+If you need to create or recreate demo users:
 
 ```bash
 cd backend
-python create_demo_user.py    # Creates buyer account
-python create_farmer_user.py  # Creates farmer account
+python create_demo_users.py   # Creates both buyer and farmer (recommended)
+# OR
+python create_demo_user.py    # Creates buyer account only
+python create_farmer_user.py  # Creates farmer account only
 ```
+
+### Checking Users in Database
+
+To see all users in the database:
+
+```bash
+cd backend
+python check_users.py
+```
+
+This will show:
+- All users with their details
+- Verification and active status
+- Demo account credentials
 
 ## 🔧 Development Tips
 
@@ -589,15 +645,27 @@ farm-project-main/
 - ✅ Fixed dashboard statistics real-time updates
 - ✅ Fixed marketplace product display (port and image URLs)
 - ✅ Created demo farmer account
-- ✅ Improved error handling throughout
+- ✅ Enhanced login endpoint with comprehensive logging
+- ✅ Created utility scripts for user management
+- ✅ Auto-create demo users on startup
+- ✅ Improved error handling and debugging throughout
 
 ### Key Features
 - ✅ One-command startup scripts for Windows and Unix
 - ✅ Automatic database table creation
+- ✅ Automatic demo user creation on first run
 - ✅ SQLite fallback for easy development
 - ✅ Public product browsing (no auth required)
 - ✅ Real-time statistics updates
 - ✅ Image upload with preview
-- ✅ Comprehensive error handling
+- ✅ Comprehensive error handling and logging
+- ✅ User management utility scripts
 
 **Last Updated:** November 2025 - All major issues resolved, project ready for smooth deployment
+
+### Latest Improvements (November 2025)
+- ✅ Enhanced login debugging with comprehensive step-by-step logging
+- ✅ Created user management utility scripts (`check_users.py`, `create_demo_users.py`)
+- ✅ Updated `start.bat` with robust path handling and auto-user creation
+- ✅ Improved documentation with detailed troubleshooting guides
+- ✅ All scripts tested and verified working

@@ -468,22 +468,55 @@ async def resend_verification(email_data: dict, db: Session = Depends(get_db)):
 @router.post("/login")
 async def login(login_data: UserLogin, db: Session = Depends(get_db)):
     try:
+        print(f"=" * 50)
+        print(f"LOGIN ATTEMPT STARTED")
+        print(f"Email/Username: {login_data.email}")
+        print(f"Password provided: {'Yes' if login_data.password else 'No'}")
+        print(f"=" * 50)
+        
+        # Query user by email or username
+        print(f"Step 1: Querying database for user...")
         user = db.query(User).filter(
             (User.email == login_data.email) |
             (User.username == login_data.email)
         ).first()
 
         if not user:
+            print(f"LOGIN FAILED: User not found with email/username: {login_data.email}")
+            print(f"Available users in database:")
+            all_users = db.query(User).all()
+            for u in all_users:
+                print(f"  - Email: {u.email}, Username: {u.username}, Verified: {u.is_verified}, Active: {u.is_active}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
-        if not verify_password(login_data.password, user.password_hash):
+        print(f"Step 2: User found!")
+        print(f"  - User ID: {user.id}")
+        print(f"  - Email: {user.email}")
+        print(f"  - Username: {user.username}")
+        print(f"  - Verified: {user.is_verified}")
+        print(f"  - Active: {user.is_active}")
+        print(f"  - Role: {user.role}")
+
+        print(f"Step 3: Verifying password...")
+        password_match = verify_password(login_data.password, user.password_hash)
+        print(f"  - Password match: {password_match}")
+        
+        if not password_match:
+            print(f"LOGIN FAILED: Password mismatch for user: {user.email}")
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
+        print(f"Step 4: Checking verification status...")
         if not user.is_verified:
+            print(f"LOGIN FAILED: User not verified - {user.email}")
             raise HTTPException(status_code=401, detail="Please verify your email first")
 
+        print(f"Step 5: Creating JWT token...")
         # Create JWT token
         token = create_access_token({"sub": user.email})
+        print(f"  - Token created successfully")
+
+        print(f"LOGIN SUCCESS: User {user.email} logged in successfully")
+        print(f"=" * 50)
 
         return {
             "access_token": token,
@@ -491,10 +524,18 @@ async def login(login_data: UserLogin, db: Session = Depends(get_db)):
             "user": UserResponse.model_validate(user)
         }
 
-    except HTTPException:
+    except HTTPException as he:
+        print(f"LOGIN HTTP EXCEPTION: {he.status_code} - {he.detail}")
+        print(f"=" * 50)
         raise
     except Exception as e:
-        print(f"Login error: {e}")
+        print(f"LOGIN UNEXPECTED ERROR:")
+        print(f"  - Error type: {type(e).__name__}")
+        print(f"  - Error message: {str(e)}")
+        import traceback
+        print(f"  - Traceback:")
+        traceback.print_exc()
+        print(f"=" * 50)
         raise HTTPException(status_code=500, detail="Internal server error during login")
 
 

@@ -107,13 +107,25 @@ See `SETUP.md` for detailed manual setup instructions and troubleshooting.
 3. Access the application in browser
 4. Check `SETUP.md` if you encounter any issues
 
-## Recent Updates (Latest Session)
+## Recent Updates (Latest Session - November 2025)
 
 ### Backend Improvements
 - Fixed field name consistency (`quantity_available` used throughout)
 - Enhanced product filtering to include all available products
 - Improved validation error messages
 - Better error handling for product creation
+- **Enhanced login endpoint with comprehensive step-by-step logging:**
+  - Shows login attempt details (email/username, password presence)
+  - Displays user lookup results with full user details
+  - Logs password verification status
+  - Checks and reports verification and active status
+  - If user not found, lists all available users in database
+  - Provides clear error messages for each failure point
+- **Created utility scripts for user management:**
+  - `check_users.py` - List all users in database with verification/active status
+  - `create_demo_users.py` - Auto-create both buyer and farmer demo users (idempotent)
+  - `create_demo_user.py` - Create buyer demo user only
+  - `create_farmer_user.py` - Create farmer demo user only
 
 ### Frontend Improvements
 - Fixed image preview layout and visibility
@@ -122,10 +134,68 @@ See `SETUP.md` for detailed manual setup instructions and troubleshooting.
 - Improved image URL handling
 - Better error messages for users
 
+### Setup & Automation Improvements
+- **Updated `start.bat` to automatically create demo users on first run:**
+  - Checks and creates demo users if they don't exist
+  - Safe to run multiple times (idempotent)
+  - Gracefully handles errors and continues if user creation fails
+  - Displays demo account credentials at the end
+- **Improved `start.bat` path handling:**
+  - Uses `%~dp0` to ensure script works from any directory
+  - All paths are now absolute and reliable
+  - Server windows start with correct working directories
+  - Better error handling and user feedback
+- **Added demo account credentials display in startup script**
+- **Improved error messages and user feedback**
+- **Enhanced documentation with login troubleshooting guide**
+
 ### Testing & Verification
 - Both servers tested and working
 - Products display correctly in marketplace
 - Dashboard statistics update accurately
 - Image uploads work properly
 - All validation errors resolved
+- **Login debugging enhanced with detailed logs:**
+  - Tested login attempts with existing users
+  - Verified logging shows all failure points
+  - Confirmed user listing works when user not found
+  - Tested password verification logging
+- **User management utilities tested and working:**
+  - `check_users.py` successfully lists all users
+  - `create_demo_users.py` safely creates/checks users
+  - Verified idempotency (safe to run multiple times)
+
+### Login Debugging Features
+
+The login endpoint now provides comprehensive logging:
+
+1. **Login Attempt Logging:**
+   - Shows email/username being used
+   - Displays each step of the login process
+   - Logs user lookup results
+   - Shows password verification status
+   - Indicates verification and active status checks
+
+2. **Error Diagnosis:**
+   - If user not found, lists all available users in database
+   - Shows specific failure point (user lookup, password, verification)
+   - Provides clear error messages for debugging
+
+3. **User Management:**
+   - `check_users.py` - View all users and their status
+   - `create_demo_users.py` - Auto-create demo users safely
+   - Both scripts are idempotent (safe to run multiple times)
+
+### Files Modified/Added
+
+**New Files:**
+- `backend/check_users.py` - User listing utility
+- `backend/create_demo_users.py` - Auto-create demo users
+
+**Modified Files:**
+- `backend/app/routers/auth.py` - Enhanced login logging
+- `start.bat` - Auto-create demo users, show credentials
+- `README.md` - Updated with login debugging info
+- `SETUP.md` - Added login troubleshooting section
+- `CHANGELOG.md` - This file
 
