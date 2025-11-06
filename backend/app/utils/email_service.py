@@ -16,6 +16,18 @@ class EmailService:
         self.smtp_port = int(os.getenv("SMTP_PORT", 587))
         self.smtp_username = os.getenv("SMTP_USERNAME")
         self.smtp_password = os.getenv("SMTP_PASSWORD")
+        
+        # Validate email configuration on startup
+        self.is_configured = bool(self.smtp_username and self.smtp_password)
+        
+        if self.is_configured:
+            print("✅ Email service configured")
+            print(f"   SMTP Server: {self.smtp_server}:{self.smtp_port}")
+            print(f"   From: {self.smtp_username}")
+        else:
+            print("⚠️  Email service not configured - using mock mode")
+            print("   Verification codes will be printed to console")
+            print("   To enable email: Add SMTP_USERNAME and SMTP_PASSWORD to .env file")
 
     def generate_verification_code(self, length=6):
         """Generate a random verification code"""
